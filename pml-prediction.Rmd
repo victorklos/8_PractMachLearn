@@ -1,0 +1,43 @@
+---
+title: "PML Prediction"
+author: "Victor Klos"
+date: "13-03-2015"
+output: html_document
+---
+
+TODO introduction 
+
+
+## Loading and cleaning the data
+
+The data is already split into a training and testing set. The format is `csv` which is readily handled by R (even though the extraneous quotes require a bit of a detour). Running a `summary` on the training set reveals that many columns contain the phrase `#DIV/0!`, so the data suffers from an export problem. Also, the column names are not 'tidy' as they contain underscores.
+
+Knowing this, loading and tidying becomes:
+
+```{r}
+nas <- c("", "\"\"", "NA", "#DIV/0!")
+training <- read.csv("pml-training.csv", colClasses="character", na.strings=nas)
+testing <- read.csv("pml-testing.csv", colClasses="character", na.strings=nas)
+colnames(training) <- colnames(testing) <- tolower(gsub("_", ".", colnames(training)))
+
+classes <- c("integer", rep("factor", 5), rep("numeric", 153), "factor")
+for (i in 1:ncol(training)) {
+  training[,i] <- do.call(paste("as", classes[i], sep="."), list(training[,i]))
+}
+```
+
+Both the testing and training set have `r dim(training)[2]` columns. The training set contains `r dim(training)[1]` rows and the testing set has `r dim(testing)[1]` rows.
+
+
+## Exploratory analysis
+
+```{r, echo=F}
+summary(training$classe)
+```
+
+## Next
+
+```{r, echo=F}
+summary(training)
+```
+
