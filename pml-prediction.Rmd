@@ -31,6 +31,37 @@ Both the testing and training set have `r dim(training)[2]` columns. The trainin
 
 ## Exploratory analysis
 
+From looking at the summary it was obvious that many columns in the training dataset suffer from missing values. Let's examine the extent of this potential problem:
+
+```{r}
+nas.per.col <- apply(training, 2, FUN=function(col) sum(is.na(col)))
+table(nas.per.col)
+```
+
+This overview tells us that _(i)_ NA's are abundant and _(ii)_ there is no fixing them as there exist no columns with only a few missing values. Hence, all columns with NA's will be removed from the dataset.
+
+Additionally, the rows with the index, user name, time stamps and window information will not aid in building a good predictor so these are removed too:
+
+```{r}
+cols.to.remove <- c(1:6, which(nas.per.col > 0))
+training <- training[-cols.to.remove]
+testing <- testing[-cols.to.remove]
+```
+
+Next, we can check if the remaining data isn't near zero or without variance:
+
+```{r, message=F}
+library(caret)
+nz <- nearZeroVar(training, saveMetrics=T)
+sum(nz$zeroVar) + sum(nz$nzv)
+```
+
+Zero columns in the danger zone; all data in the current training set is meant to be. Let's move on to building some predictors...
+
+
+
+## Appendix: Training data summary
+
 ```{r, echo=F}
 summary(training$classe)
 ```
