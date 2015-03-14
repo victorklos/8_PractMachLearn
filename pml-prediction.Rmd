@@ -40,7 +40,7 @@ nas.per.col <- apply(training, 2, FUN=function(col) sum(is.na(col)))
 table(nas.per.col)
 ```
 
-This overview tells us that _(i)_ NA's are abundant and _(ii)_ there is no fixing them as there exist no columns with only a few missing values. Hence, all columns with NA's will be removed from the dataset.
+This overview tells us that _(i)_ NA's are abundant and _(ii)_ there is no fixing them as there exist no columns with only a few missing values. Hence, all columns with NA's need to be removed from the dataset.
 
 Additionally, the rows with the index, user name, time stamps and window information will not aid in building a good predictor so these are removed too:
 
@@ -63,65 +63,80 @@ The outcome of zero indicates that all data may have relevance for the predictor
 
 ## Building predictors
 
+For our purposes, the training dataset is subsetted into a training dataset and a probe dataset. The latter will be used to estimate the out-of-sample error of our predictors:
+
+```{r}
+#training <- training[sample(nrow(training), nrow(training)*.2),]
+in.train <- createDataPartition(y=training$classe, p=.7, list=F)
+probe <- training[-in.train,]
+training <- training[in.train,]
+```
+
 The goal of the assignment is to build a predictor for the `classe` variable:
 
 ```{r, echo=F}
 summary(training$classe)
 ```
 
-```{r, echo=F}
+```{r, echo=F, message=F}
 # Set up for parallel processing as per
 # https://class.coursera.org/predmachlearn-012/forum/thread?thread_id=61
 library(parallel); library(doParallel)
-registerDoParallel(clust <- makeForkCluster(detectCores()-1))
+registerDoParallel(makeForkCluster(detectCores()))
 ```
 
-It is well known that `random forests` (RF) give the best out-of-the-box results when it comes to building predictors. Their results however are not very human-interpretable. For this reason `rpart`, a recursive partitioning model, is also included. While looking for alternatives to RF a `neural network` was tried too but with little success ($$<<50%$$ accuracy).
+### Generating prediction models
 
-```{r, message=F}
+It is well known that `random forests` (RF) give the best out-of-the-box results when it comes to building predictors from unstructured data. Their results however are not very human-interpretable. For this reason `rpart`, a recursive partitioning (RP) model, is also included. While looking for alternatives to RF a `neural network` (NN) was tried too but with little success (around 50% accuracy).
+
+```{r, message=F, warning=F}
 set.seed(42)
 
-training <- training[sample(nrow(training), nrow(training)*.5),] # keep half samples
-validation <- testing
-testing <- 
-eval <- training[sample(nrow(training), 400),]
-training <- training[sample(nrow(training), 2000),]
 fit.rf <- train(classe ~ ., data=training, method="rf")
 fit.rp <- train(classe ~ ., data=training, method="rpart2")
 fit.nn <- train(classe ~ ., data=training, method="nnet", maxit = 1000,
-                tuneGrid = expand.grid(.decay = .025, .size = c(11,25)),
-                trace = F, linout = T)
+                tuneGrid = expand.grid(.decay = .04, .size = c(11,25,35)),
+                trace=F, linout=T)
 ```
 
-### Results of Random Forest
+### Results
 
 ```{r}
-cm <- confusionMatrix(predict(fit.rf, newdata=eval), eval$classe)
-cm$table
-cm$overall
+cm.rf <- confusionMatrix(predict(fit.rf, newdata=probe), probe$classe)
+cm.rp <- confusionMatrix(predict(fit.rp, newdata=probe), probe$classe)
+cm.nn <- confusionMatrix(predict(fit.nn, newdata=probe), probe$classe)
+cbind(as.data.frame.matrix(cm.rf$table), o=rep("",5),
+      as.data.frame.matrix(cm.rp$table), o=rep("",5),
+      as.data.frame.matrix(cm.nn$table))
 ```
 
-### Results of Recursive Partitioning
+The table above includes the confusion matrices of the Random Forest model, the Recursive Partinioning model and the Neural Network model (from left to right) with the prediction vertically against the reference horizontally.
+
+The model accuracies in numbers:
 
 ```{r}
-cm <- confusionMatrix(predict(fit.rp, newdata=eval), eval$classe)
-cm$table
-cm$overall
+rbind(RF=cm.rf$overall, RP=cm.rp$overall, NN=cm.nn$overall)[,c(2,3,4,1)]
 ```
 
-### Results of Neural Network
+Note that because the predictions were done on the probe set, the accuries in this section reflect the expected out-of-sample behaviour.
+
+As promised, here is a decision tree for some human insight:
+
+```{r, message=F, dev='svg'}
+library(rattle)
+fancyRpartPlot(fit.rp$finalModel, sub="")
+```
+
+
+### Model selection
+
+It is quite clear from the accuracy tables in the previous section that RF outperforms the others by quite some length. Accordingly, this is the selected model.
+
+## Testing
+
+Finally let's test our predictor against the testing data set:
 
 ```{r}
-cm <- confusionMatrix(predict(fit.nn, newdata=eval), eval$classe)
-cm$table
-cm$overall
-```
-
-## Appendix: Training data summary
-
-## Next
-
-```{r, echo=F}
-summary(training)
+print(outcome <- predict(fit.rf, testing))
 ```
 
