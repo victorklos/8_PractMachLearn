@@ -23,10 +23,12 @@ colnames(training) <- colnames(testing) <- tolower(gsub("_", ".", colnames(train
 classes <- c("integer", rep("factor", 5), rep("numeric", 153), "factor")
 for (i in 1:ncol(training)) {
   training[,i] <- do.call(paste("as", classes[i], sep="."), list(training[,i]))
+  testing[,i] <- do.call(paste("as", classes[i], sep="."), list(testing[,i]))
 }
+testing <- testing[-ncol(testing)]
 ```
 
-Both the testing and training set have `r dim(training)[2]` columns. The training set contains `r dim(training)[1]` rows and the testing set has `r dim(testing)[1]` rows.
+The training data set contains `r dim(training)[2]` columns. The testing data set has one less; it is the 'classe' column that needs to be predicted. The training set contains `r dim(training)[1]` rows and the testing set has `r dim(testing)[1]` rows.
 
 
 ## Exploratory analysis
@@ -43,7 +45,7 @@ This overview tells us that _(i)_ NA's are abundant and _(ii)_ there is no fixin
 Additionally, the rows with the index, user name, time stamps and window information will not aid in building a good predictor so these are removed too:
 
 ```{r}
-cols.to.remove <- c(1:6, which(nas.per.col > 0))
+cols.to.remove <- c(1:7, which(nas.per.col > 0))
 training <- training[-cols.to.remove]
 testing <- testing[-cols.to.remove]
 ```
@@ -56,15 +58,66 @@ nz <- nearZeroVar(training, saveMetrics=T)
 sum(nz$zeroVar) + sum(nz$nzv)
 ```
 
-Zero columns in the danger zone; all data in the current training set is meant to be. Let's move on to building some predictors...
+The outcome of zero indicates that all data may have relevance for the predictor.
 
 
+## Building predictors
 
-## Appendix: Training data summary
+The goal of the assignment is to build a predictor for the `classe` variable:
 
 ```{r, echo=F}
 summary(training$classe)
 ```
+
+```{r, echo=F}
+# Set up for parallel processing as per
+# https://class.coursera.org/predmachlearn-012/forum/thread?thread_id=61
+library(parallel); library(doParallel)
+registerDoParallel(clust <- makeForkCluster(detectCores()-1))
+```
+
+It is well known that `random forests` (RF) give the best out-of-the-box results when it comes to building predictors. Their results however are not very human-interpretable. For this reason `rpart`, a recursive partitioning model, is also included. While looking for alternatives to RF a `neural network` was tried too but with little success ($$<<50%$$ accuracy).
+
+```{r, message=F}
+set.seed(42)
+
+training <- training[sample(nrow(training), nrow(training)*.5),] # keep half samples
+validation <- testing
+testing <- 
+eval <- training[sample(nrow(training), 400),]
+training <- training[sample(nrow(training), 2000),]
+fit.rf <- train(classe ~ ., data=training, method="rf")
+fit.rp <- train(classe ~ ., data=training, method="rpart2")
+fit.nn <- train(classe ~ ., data=training, method="nnet", maxit = 1000,
+                tuneGrid = expand.grid(.decay = .025, .size = c(11,25)),
+                trace = F, linout = T)
+```
+
+### Results of Random Forest
+
+```{r}
+cm <- confusionMatrix(predict(fit.rf, newdata=eval), eval$classe)
+cm$table
+cm$overall
+```
+
+### Results of Recursive Partitioning
+
+```{r}
+cm <- confusionMatrix(predict(fit.rp, newdata=eval), eval$classe)
+cm$table
+cm$overall
+```
+
+### Results of Neural Network
+
+```{r}
+cm <- confusionMatrix(predict(fit.nn, newdata=eval), eval$classe)
+cm$table
+cm$overall
+```
+
+## Appendix: Training data summary
 
 ## Next
 
