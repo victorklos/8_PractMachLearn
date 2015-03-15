@@ -66,7 +66,7 @@ The outcome of zero indicates that all data may have relevance for the predictor
 For our purposes, the training dataset is subsetted into a training dataset and a probe dataset. The latter will be used to estimate the out-of-sample error of our predictors:
 
 ```{r}
-#training <- training[sample(nrow(training), nrow(training)*.2),]
+#training <- training[sample(nrow(training), nrow(training)*.25),]
 in.train <- createDataPartition(y=training$classe, p=.7, list=F)
 probe <- training[-in.train,]
 training <- training[in.train,]
@@ -122,7 +122,7 @@ Note that because the predictions were done on the probe set, the accuries in th
 
 As promised, here is a decision tree for some human insight:
 
-```{r, message=F, dev='svg'}
+```{r, message=F, dev='svg', fig.width=10}
 library(rattle)
 fancyRpartPlot(fit.rp$finalModel, sub="")
 ```
