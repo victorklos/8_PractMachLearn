@@ -138,7 +138,19 @@ It is quite clear from the accuracy tables in the previous section that RF outpe
 
 Finally let's test our predictor against the testing data set:
 
+```{r, echo=F}
+# From the submission page
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+```
+
 ```{r}
-print(outcome <- predict(fit.rf, testing))
+print(answers <- predict(fit.rf, testing))
+pml_write_files(answers)
 ```
 
