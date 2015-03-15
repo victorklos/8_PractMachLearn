@@ -25,7 +25,7 @@ for (i in 1:ncol(training)) {
   training[,i] <- do.call(paste("as", classes[i], sep="."), list(training[,i]))
   testing[,i] <- do.call(paste("as", classes[i], sep="."), list(testing[,i]))
 }
-testing <- testing[-ncol(testing)]
+testing <- testing[-ncol(testing)] # remove problem_id column
 ```
 
 The training data set contains `r dim(training)[2]` columns. The testing data set has one less; it is the 'classe' column that needs to be predicted. The training set contains `r dim(training)[1]` rows and the testing set has `r dim(testing)[1]` rows.
@@ -95,7 +95,7 @@ set.seed(42)
 fit.rf <- train(classe ~ ., data=training, method="rf")
 fit.rp <- train(classe ~ ., data=training, method="rpart2")
 fit.nn <- train(classe ~ ., data=training, method="nnet", maxit = 1000,
-                tuneGrid = expand.grid(.decay = .04, .size = c(25,35,45)),
+                tuneGrid = expand.grid(.decay = .04, .size = c(15,25,35)),
                 trace=F, linout=T)
 ```
 
@@ -127,16 +127,16 @@ library(rattle)
 fancyRpartPlot(fit.rp$finalModel, sub="")
 ```
 
-As the total accuracy of the RP model is only `r round(100%cm.rp$overall[1],0)`% this figure should not be used as guidance when determining a classification.
+As the total accuracy of the RP model is only `r round(100*cm.rp$overall[1],0)`% this figure should not be used as guidance when determining a classification.
 
 
 ### Model selection
 
-It is quite clear from the accuracy tables in the previous section that RF outperforms the others by quite some length. Accordingly, this is the selected model.
+From the accuracy tables in the previous section it is evident that RF outperforms the others by quite some length. Accordingly and unsurprisingly, this is the selected model.
 
-## Testing
+## Verification
 
-Finally let's test our predictor against the testing data set:
+Finally let's run our predictor against the testing data set:
 
 ```{r, echo=F}
 # From the submission page
@@ -154,3 +154,17 @@ print(answers <- predict(fit.rf, testing))
 pml_write_files(answers)
 ```
 
+
+## Conclusions and remarks
+
+After cleaning the data and removing many columns with NA's, a tidy data set was gained from the input files. This set was split 70-30 into a training set and a probe set. With the training set, three machine learning algorithms were instructed to create a model:
+
+1. Random Forests
+2. Recursive Partitioning
+3. Neural Network
+
+From these algorithms the first one (RF) yielded the best result with an out-of-sample accuracy of over 99%. The predictions with the testing set scored 20 out of 20 (100%).
+
+Interestingly enough, the Neural Network (NN) came in second. During the development of this report many runs were performed with a reduced size training set in order to improve performance. During those runs, the NN didn't always impress with accuracy  scores below 50%. This goes to show that (dataset) size does matter :-).
+
+Finally it may be worth mentioning that this writeup is the result of redoing the complete Practical Machine Learning class on Coursera and quite some interweb and forum searching. Many thanks to all the helpful people out there!
