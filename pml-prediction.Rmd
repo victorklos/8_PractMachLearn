@@ -87,7 +87,7 @@ registerDoParallel(makeForkCluster(detectCores()))
 
 ### Generating prediction models
 
-It is well known that `random forests` (RF) give the best out-of-the-box results when it comes to building predictors from unstructured data. Their results however are not very human-interpretable. For this reason `rpart`, a recursive partitioning (RP) model, is also included. While looking for alternatives to RF a `neural network` (NN) was tried too but with little success (around 50% accuracy).
+It is well known that `random forests` (RF) give the best out-of-the-box results when it comes to building predictors from unstructured data. Their results however are not very human-interpretable. For this reason `rpart`, a recursive partitioning (RP) model, is also included. While looking for alternatives to RF a `neural network` (NN) was tried too, out of curiosity.
 
 ```{r, message=F, warning=F}
 set.seed(42)
@@ -95,7 +95,7 @@ set.seed(42)
 fit.rf <- train(classe ~ ., data=training, method="rf")
 fit.rp <- train(classe ~ ., data=training, method="rpart2")
 fit.nn <- train(classe ~ ., data=training, method="nnet", maxit = 1000,
-                tuneGrid = expand.grid(.decay = .04, .size = c(11,25,35)),
+                tuneGrid = expand.grid(.decay = .04, .size = c(25,35,45)),
                 trace=F, linout=T)
 ```
 
@@ -126,6 +126,8 @@ As promised, here is a decision tree for some human insight:
 library(rattle)
 fancyRpartPlot(fit.rp$finalModel, sub="")
 ```
+
+As the total accuracy of the RP model is only `r round(100%cm.rp$overall[1],0)`% this figure should not be used as guidance when determining a classification.
 
 
 ### Model selection
