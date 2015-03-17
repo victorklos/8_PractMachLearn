@@ -1,11 +1,13 @@
 ---
 title: "PML Prediction"
 author: "Victor Klos"
-date: "13-03-2015"
+date: "17-03-2015"
 output: html_document
 ---
 
-TODO introduction 
+This writeup is for the assignment part of the [Practical Machine Learning](https://class.coursera.org/predmachlearn-012/) course at [Coursera](http://coursera.org). The goal is to create a predictor for the `classe` variable of a given dataset. This variable indicates how well some excersise is performed by a group of test subjects.
+
+More details on the assignment can be found at the [assignment page](https://class.coursera.org/predmachlearn-012/human_grading/view/courses/973547/assessments/4/submissions), more details on the data set are available at the [Human Activity Recognition project page](http://groupware.les.inf.puc-rio.br/har).
 
 
 ## Loading and cleaning the data
@@ -28,10 +30,7 @@ for (i in 1:ncol(training)) {
 testing <- testing[-ncol(testing)] # remove problem_id column
 ```
 
-The training data set contains `r dim(training)[2]` columns. The testing data set has one less; it is the 'classe' column that needs to be predicted. The training set contains `r dim(training)[1]` rows and the testing set has `r dim(testing)[1]` rows.
-
-
-## Exploratory analysis
+The training data set contains `r dim(training)[2]` columns (or 'features'). The testing data set has one less; it is the 'classe' column that needs to be predicted. The training set contains `r dim(training)[1]` rows and the testing set has `r dim(testing)[1]` rows.
 
 From looking at the summary it was obvious that many columns in the training dataset suffer from missing values. Let's examine the extent of this potential problem:
 
@@ -50,7 +49,10 @@ training <- training[-cols.to.remove]
 testing <- testing[-cols.to.remove]
 ```
 
-Next, we can check if the remaining data isn't near zero or without variance:
+
+## Exploratory analysis
+
+Our dataset has been reduced to `r dim(testing)[2]` columns. It is important to know if these features aren't near zero or without variance:
 
 ```{r, message=F}
 library(caret)
@@ -58,7 +60,15 @@ nz <- nearZeroVar(training, saveMetrics=T)
 sum(nz$zeroVar) + sum(nz$nzv)
 ```
 
-The outcome of zero indicates that all data may have relevance for the predictor.
+The outcome of zero indicates that all featues may have relevance for a predictor.
+
+The goal of the assignment is to build a predictor for the `classe` variable, which is distributed quite evenly:
+
+```{r, echo=F}
+summary(training$classe)
+```
+
+As the remaining features are quite large in number and many "are just numbers" (and difficult to interpret by humans) we will skip further exploration for now and see how well we can do without. 
 
 
 ## Building predictors
@@ -66,16 +76,10 @@ The outcome of zero indicates that all data may have relevance for the predictor
 For our purposes, the training dataset is subsetted into a training dataset and a probe dataset. The latter will be used to estimate the out-of-sample error of our predictors:
 
 ```{r}
-#training <- training[sample(nrow(training), nrow(training)*.25),]
-in.train <- createDataPartition(y=training$classe, p=.7, list=F)
-probe <- training[-in.train,]
-training <- training[in.train,]
-```
-
-The goal of the assignment is to build a predictor for the `classe` variable, which is distributed as follows (in the training set):
-
-```{r, echo=F}
-summary(training$classe)
+#training <- training[sample(nrow(training), nrow(training)*.2),]
+inTrain <- createDataPartition(y=training$classe, p=.7, list=F)
+probe <- training[-inTrain,]
+training <- training[inTrain,]
 ```
 
 ```{r, echo=F, message=F}
@@ -87,7 +91,7 @@ registerDoParallel(makeForkCluster(detectCores()))
 
 ### Generating prediction models
 
-It is well known that `random forests` (RF) give the best out-of-the-box results when it comes to building predictors from unstructured data. Their results however are not very human-interpretable. For this reason `rpart`, a recursive partitioning (RP) model, is also included. While looking for alternatives to RF a `neural network` (NN) was tried too, out of curiosity.
+It is well known that `random forests` (RF) give excellent out-of-the-box results when it comes to building predictors from unstructured data. Their results however are not very human-interpretable. For this reason `rpart`, a recursive partitioning (RP) model, is also included. While searching for alternatives to RF a `neural network` (NN) was found and included, out of curiosity.
 
 ```{r, message=F, warning=F}
 set.seed(42)
@@ -95,7 +99,7 @@ tc <- trainControl(method = "repeatedcv", repeats = 3, number=5)
 fit.rf <- train(classe ~ ., data=training, trControl=tc, method="rf")
 fit.rp <- train(classe ~ ., data=training, trControl=tc, method="rpart2")
 fit.nn <- train(classe ~ ., data=training, trControl=tc, method="nnet", maxit = 1000,
-                tuneGrid = expand.grid(.decay = .04, .size = c(15,25,35)),
+                tuneGrid = expand.grid(.decay = .04, .size = c(10,20,30)),
                 trace=F, linout=T, preProc=c("center", "scale"))
 ```
 
@@ -107,14 +111,14 @@ Besides cross-validating three different algorithms, each algorithm itself is cr
 cm.rf <- confusionMatrix(predict(fit.rf, newdata=probe), probe$classe)
 cm.rp <- confusionMatrix(predict(fit.rp, newdata=probe), probe$classe)
 cm.nn <- confusionMatrix(predict(fit.nn, newdata=probe), probe$classe)
-cbind(as.data.frame.matrix(cm.rf$table), "   "=rep("",5),
-      as.data.frame.matrix(cm.rp$table), "   "=rep("",5),
+cbind(as.data.frame.matrix(cm.rf$table), " "=rep("",5),
+      as.data.frame.matrix(cm.rp$table), " "=rep("",5),
       as.data.frame.matrix(cm.nn$table))
 ```
 
-The table above includes the confusion matrices of the Random Forest model, the Recursive Partinioning model and the Neural Network model (from left to right) with the prediction vertically against the reference horizontally.
+This table comprises the confusion matrices of the Random Forest model, the Recursive Partitioning model and the Neural Network model (from left to right) with the prediction vertically against the reference horizontally. The differences in accuracy of the three algorithms are clearly visible.
 
-The model accuracies in numbers:
+The models accuracies in numbers:
 
 ```{r}
 rbind(RF=cm.rf$overall, RP=cm.rp$overall, NN=cm.nn$overall)[,c(3,4,1)]
@@ -140,11 +144,11 @@ As the accuracy of the RP model is only `r round(100*cm.rp$overall[1],0)`% this 
 
 ### Model selection
 
-From the accuracy tables in the previous section it is evident that RF outperforms the others by quite some length. Accordingly and unsurprisingly, this is the selected model.
+From the accuracy tables in the previous section it is evident that RF outperforms the others by quite some length. Accordingly and unsurprisingly, this model is selected.
 
 ## Verification
 
-Finally let's run our predictor against the testing data set:
+Finally let's run our winning predictor against the testing data set:
 
 ```{r, echo=F}
 # From the submission page
@@ -167,7 +171,7 @@ print("Printing supressed as that may violate the Coursera Honor Code.")
 
 ## Conclusions and remarks
 
-After cleaning the data and removing many columns with NA's, a tidy data set was gained from the input files. This set was split 70-30 into a training set and a probe set. With the training set, three machine learning algorithms were instructed to create a model:
+After cleaning the data and removing many columns with NA's, a tidy data set was gained from the input files. This set was split 70-30 into a training set and a probe set. With the training set, three machine learning algorithms were instructed to train a model:
 
 1. Random Forests
 2. Recursive Partitioning
