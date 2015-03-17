@@ -72,7 +72,7 @@ probe <- training[-in.train,]
 training <- training[in.train,]
 ```
 
-The goal of the assignment is to build a predictor for the `classe` variable:
+The goal of the assignment is to build a predictor for the `classe` variable, which is distributed as follows (in the training set):
 
 ```{r, echo=F}
 summary(training$classe)
@@ -91,13 +91,15 @@ It is well known that `random forests` (RF) give the best out-of-the-box results
 
 ```{r, message=F, warning=F}
 set.seed(42)
-
-fit.rf <- train(classe ~ ., data=training, method="rf")
-fit.rp <- train(classe ~ ., data=training, method="rpart2")
-fit.nn <- train(classe ~ ., data=training, method="nnet", maxit = 1000,
+tc <- trainControl(method = "repeatedcv", repeats = 3, number=5)
+fit.rf <- train(classe ~ ., data=training, trControl=tc, method="rf")
+fit.rp <- train(classe ~ ., data=training, trControl=tc, method="rpart2")
+fit.nn <- train(classe ~ ., data=training, trControl=tc, method="nnet", maxit = 1000,
                 tuneGrid = expand.grid(.decay = .04, .size = c(15,25,35)),
-                trace=F, linout=T)
+                trace=F, linout=T, preProc=c("center", "scale"))
 ```
+
+Besides cross-validating three different algorithms, each algorithm itself is cross-validated. The `trainControl` parameter above specifies a Repeated Cross Validation with 3 repeats and a 5-fold random subsampling. This should suffice to obtain a well-estimated out-of-sample error from the in-sample training dataset.
 
 ### Results
 
@@ -105,8 +107,8 @@ fit.nn <- train(classe ~ ., data=training, method="nnet", maxit = 1000,
 cm.rf <- confusionMatrix(predict(fit.rf, newdata=probe), probe$classe)
 cm.rp <- confusionMatrix(predict(fit.rp, newdata=probe), probe$classe)
 cm.nn <- confusionMatrix(predict(fit.nn, newdata=probe), probe$classe)
-cbind(as.data.frame.matrix(cm.rf$table), o=rep("",5),
-      as.data.frame.matrix(cm.rp$table), o=rep("",5),
+cbind(as.data.frame.matrix(cm.rf$table), "   "=rep("",5),
+      as.data.frame.matrix(cm.rp$table), "   "=rep("",5),
       as.data.frame.matrix(cm.nn$table))
 ```
 
@@ -115,10 +117,16 @@ The table above includes the confusion matrices of the Random Forest model, the 
 The model accuracies in numbers:
 
 ```{r}
-rbind(RF=cm.rf$overall, RP=cm.rp$overall, NN=cm.nn$overall)[,c(2,3,4,1)]
+rbind(RF=cm.rf$overall, RP=cm.rp$overall, NN=cm.nn$overall)[,c(3,4,1)]
 ```
 
-Note that because the predictions were done on the probe set, the accuries in this section reflect the expected out-of-sample behaviour.
+Note that because the predictions were done on the probe set, the accuries above reflect the expected out-of-sample behaviour. For completeness, here is the in-sample accuracy prediction:
+
+```{r}
+fit.rf$results[,c(1,2,4)]
+```
+
+So using Repeated Cross Validation with the above parameters causes a slight _underestimation_ of the final out-of-sample accuracy.
 
 As promised, here is a decision tree for some human insight:
 
@@ -127,7 +135,7 @@ library(rattle)
 fancyRpartPlot(fit.rp$finalModel, sub="")
 ```
 
-As the total accuracy of the RP model is only `r round(100*cm.rp$overall[1],0)`% this figure should not be used as guidance when determining a classification.
+As the accuracy of the RP model is only `r round(100*cm.rp$overall[1],0)`% this figure should not be used as guidance when determining a classification.
 
 
 ### Model selection
@@ -150,8 +158,10 @@ pml_write_files = function(x){
 ```
 
 ```{r}
-print(answers <- predict(fit.rf, testing))
+answers <- predict(fit.rf, testing)
 pml_write_files(answers)
+#print(answers)
+print("Printing supressed as that may violate the Coursera Honor Code.")
 ```
 
 
@@ -165,6 +175,6 @@ After cleaning the data and removing many columns with NA's, a tidy data set was
 
 From these algorithms the first one (RF) yielded the best result with an out-of-sample accuracy of over 99%. The predictions with the testing set scored 20 out of 20 (100%).
 
-Interestingly enough, the Neural Network (NN) came in second. During the development of this report many runs were performed with a reduced size training set in order to improve performance. During those runs, the NN didn't always impress with accuracy  scores below 50%. This goes to show that (dataset) size does matter :-).
+Interestingly enough, the Neural Network (NN) came in second. During the development of this report many runs were performed with a reduced size training set in order to reduce waiting times. During those runs, the NN didn't always impress with accuracy  scores below 50%. This goes to show that (dataset) size does matter :-).
 
 Finally it may be worth mentioning that this writeup is the result of redoing the complete Practical Machine Learning class on Coursera and quite some interweb and forum searching. Many thanks to all the helpful people out there!
