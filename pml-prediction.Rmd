@@ -105,6 +105,17 @@ fit.nn <- train(classe ~ ., data=training, trControl=tc, method="nnet", maxit = 
 
 Besides cross-validating three different algorithms, each algorithm itself is cross-validated. The `trainControl` parameter above specifies a Repeated Cross Validation with 3 repeats and a 5-fold random subsampling. This should suffice to obtain a well-estimated out-of-sample error from the in-sample training dataset.
 
+The reported in-sample accuracy values are:
+
+```{r}
+rbind(RF = fit.rf$results[fit.rf$results$mtry == fit.rf$finalModel$mtry,][2],
+      RP = fit.rp$results[fit.rp$results$maxdepth == fit.rp$finalModel$tuneValue$maxdepth,][2],
+      NN = fit.nn$results[fit.nn$results$size == fit.nn$finalModel$n[2],][3])
+```
+
+Based on these values we would expect the Random Forest to perform best.
+
+
 ### Results
 
 ```{r}
@@ -124,13 +135,7 @@ The models accuracies in numbers:
 rbind(RF=cm.rf$overall, RP=cm.rp$overall, NN=cm.nn$overall)[,c(3,4,1)]
 ```
 
-Note that because the predictions were done on the probe set, the accuries above reflect the expected out-of-sample behaviour. For completeness, here is the in-sample accuracy prediction:
-
-```{r}
-fit.rf$results[,c(1,2,4)]
-```
-
-So using Repeated Cross Validation with the above parameters causes a slight _underestimation_ of the final out-of-sample accuracy.
+Note that because the predictions were done on the probe set, the accuries above reflect the expected out-of-sample behaviour. Also note that using Repeated Cross Validation with the current parameters causes a slight _underestimation_ of the final out-of-sample accuracy.
 
 As promised, here is a decision tree for some human insight:
 
